@@ -332,7 +332,7 @@ start() {
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
-            LOGI "x-ui 已成功启动"
+            LOGI "3X-UI 已成功启动"
         else
             LOGE "面板启动失败，可能是启动时间超过两秒，请稍后查看日志信息"
         fi
@@ -353,7 +353,7 @@ stop() {
         sleep 2
         check_status
         if [[ $? == 1 ]]; then
-            LOGI "x-ui 和 Xray 已成功关闭"
+            LOGI "3X-UI 和 Xray 已成功关闭"
         else
             LOGE "面板关闭失败，可能是停止时间超过两秒，请稍后查看日志信息"
         fi
@@ -369,7 +369,7 @@ restart() {
     sleep 2
     check_status
     if [[ $? == 0 ]]; then
-        LOGI "x-ui and Xray 已成功重启"
+        LOGI "3X-UI 和 Xray 已成功重启"
     else
         LOGE "面板重启失败，可能是启动时间超过两秒，请稍后查看日志信息"
     fi
@@ -881,8 +881,8 @@ ssl_cert_issue_main() {
 } 
 
 ssl_cert_issue() { 
-    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}') 
-    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}') 
+    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}') 
+    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}') 
     # 首先检查 acme.sh
     if ! command -v ~/.acme.sh/acme.sh &>/dev/null; then 
         echo "未找到 acme.sh，将进行安装" 
@@ -914,7 +914,7 @@ ssl_cert_issue() {
     esac 
     if [ $? -ne 0 ]; then 
         LOGE "安装 socat 失败，请检查日志"
-exit 1 
+        exit 1 
      else 
          LOGI "安装 socat 成功..." 
      fi 
@@ -989,10 +989,12 @@ exit 1
              ;; 
          esac 
      fi
-# 安装证书
-     ~/.acme.sh/acme.sh --installcert -d ${domain} \ 
-         --key-file /root/cert/${domain}/privkey.pem \ 
-         --fullchain-file /root/cert/${domain}/fullchain.pem --reloadcmd "${reloadCmd}" 
+     
+     # 安装证书
+     ~/.acme.sh/acme.sh --installcert -d ${domain} \
+        --key-file /root/cert/${domain}/privkey.pem \
+        --fullchain-file /root/cert/${domain}/fullchain.pem \
+        --reloadcmd "${reloadCmd}"
  
      if [ $? -ne 0 ]; then 
          LOGE "安装证书失败，正在退出。" 
@@ -1024,9 +1026,14 @@ exit 1
          if [[ -f "$webCertFile" && -f "$webKeyFile" ]]; then 
              /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile" 
              LOGI "已为域名设置面板路径: $domain" 
+             echo ""
              LOGI "  - 证书文件: $webCertFile" 
              LOGI "  - 私钥文件: $webKeyFile" 
-             echo -e "${green}访问 URL: https://${domain}:${existing_port}${existing_webBasePath}${plain}" 
+             echo ""
+             echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${existing_webBasePath}${plain}" 
+             echo ""
+             echo -e "${green}PS：若您要登录访问面板，请复制上面的地址到浏览器即可${plain}"
+             echo ""
              restart 
          else 
              LOGE "错误：未找到域名的证书或私钥文件: $domain。" 
@@ -1036,8 +1043,8 @@ exit 1
      fi 
  } 
 ssl_cert_issue_CF() { 
-     local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}') 
-     local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}') 
+     local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}') 
+     local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}') 
      LOGI "****** 使用说明 ******" 
      LOGI "请按照以下步骤完成操作：" 
      LOGI "1. 准备好在 Cloudflare 注册的电子邮箱。" 
@@ -1094,7 +1101,8 @@ ssl_cert_issue_CF() {
          else 
              LOGI "证书颁发成功，正在安装..." 
          fi
-# 安装证书
+         
+          # 安装证书
          certPath="/root/cert/${CF_Domain}" 
          if [ -d "$certPath" ]; then 
              rm -rf ${certPath} 
@@ -1131,9 +1139,10 @@ ssl_cert_issue_CF() {
                  ;; 
              esac 
          fi 
-         ~/.acme.sh/acme.sh --installcert -d ${CF_Domain} -d *.${CF_Domain} \ 
-             --key-file ${certPath}/privkey.pem \ 
-             --fullchain-file ${certPath}/fullchain.pem --reloadcmd "${reloadCmd}" 
+         ~/.acme.sh/acme.sh --installcert -d ${CF_Domain} -d *.${CF_Domain} \
+            --key-file ${certPath}/privkey.pem \
+            --fullchain-file ${certPath}/fullchain.pem \
+            --reloadcmd "${reloadCmd}" 
          
          if [ $? -ne 0 ]; then 
              LOGE "证书安装失败，脚本正在退出..." 
@@ -1162,9 +1171,14 @@ ssl_cert_issue_CF() {
              if [[ -f "$webCertFile" && -f "$webKeyFile" ]]; then 
                  /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile" 
                  LOGI "已为域名设置面板路径: $CF_Domain" 
+                 echo ""
                  LOGI "  - 证书文件: $webCertFile" 
                  LOGI "  - 私钥文件: $webKeyFile" 
-                 echo -e "${green}访问 URL: https://${CF_Domain}:${existing_port}${existing_webBasePath}${plain}" 
+                 echo ""
+                 echo -e "${green}登录访问面板URL: https://${CF_Domain}:${existing_port}${existing_webBasePath}${plain}" 
+                 echo ""
+                 echo -e "${green}PS：若您要登录访问面板，请复制上面的地址到浏览器即可${plain}"
+                 echo ""
                  restart 
              else 
                  LOGE "错误：未找到域名的证书或私钥文件: $CF_Domain。" 
