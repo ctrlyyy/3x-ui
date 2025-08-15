@@ -41,20 +41,20 @@ arch() {
 }
 
 echo ""
-check_glibc_version() {
-    glibc_version=$(ldd --version | head -n1 | awk '{print $NF}')
+# check_glibc_version() {
+#    glibc_version=$(ldd --version | head -n1 | awk '{print $NF}')
 
-    required_version="2.32"
-    if [[ "$(printf '%s\n' "$required_version" "$glibc_version" | sort -V | head -n1)" != "$required_version" ]]; then
-        echo -e "${red}------>>>GLIBC版本 $glibc_version 太旧了！ 要求2.32或以上版本${plain}"
-        echo -e "${green}-------->>>>请升级到较新版本的操作系统以便获取更高版本的GLIBC${plain}"
-        exit 1
-    fi
-        echo -e "${green}-------->>>>GLIBC版本： $glibc_version（符合高于2.32的要求）${plain}"
-}
-check_glibc_version
+#    required_version="2.32"
+#    if [[ "$(printf '%s\n' "$required_version" "$glibc_version" | sort -V | head -n1)" != "$required_version" ]]; then
+#        echo -e "${red}------>>>GLIBC版本 $glibc_version 太旧了！ 要求2.32或以上版本${plain}"
+#        echo -e "${green}-------->>>>请升级到较新版本的操作系统以便获取更高版本的GLIBC${plain}"
+#        exit 1
+#    fi
+#        echo -e "${green}-------->>>>GLIBC版本： $glibc_version（符合高于2.32的要求）${plain}"
+# }
+# check_glibc_version
 
-echo ""
+# echo ""
 echo -e "${yellow}---------->>>>>当前系统的架构为: $(arch)${plain}"
 echo ""
 last_version=$(curl -Ls "https://api.github.com/repos/xeefei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
@@ -184,7 +184,7 @@ config_after_install() {
         echo -e "${yellow}您的密码将是: ${config_password}${plain}"
         read -p "请设置面板端口: " config_port
         echo -e "${yellow}您的面板端口号为: ${config_port}${plain}"
-        read -p "请设置面板登录访问路径（访问方式演示：ip:端口号/路径/）: " config_webBasePath
+        read -p "请设置面板登录访问路径: " config_webBasePath
         echo -e "${yellow}您的面板访问路径为: ${config_webBasePath}${plain}"
         echo -e "${yellow}正在初始化，请稍候...${plain}"
         /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password}
@@ -200,10 +200,11 @@ config_after_install() {
         echo -e "${red}--------------->>>>Cancel...--------------->>>>>>>取消修改...${plain}"
         echo ""
         if [[ ! -f "/etc/x-ui/x-ui.db" ]]; then
-            local usernameTemp=$(head -c 6 /dev/urandom | base64)
-            local passwordTemp=$(head -c 6 /dev/urandom | base64)
-            local webBasePathTemp=$(gen_random_string 10)
+            local usernameTemp=$(head -c 10 /dev/urandom | base64)
+            local passwordTemp=$(head -c 10 /dev/urandom | base64)
+            local webBasePathTemp=$(gen_random_string 15)
             /usr/local/x-ui/x-ui setting -username ${usernameTemp} -password ${passwordTemp} -webBasePath ${webBasePathTemp}
+            echo ""
             echo -e "${yellow}检测到为全新安装，出于安全考虑将生成随机登录信息:${plain}"
             echo -e "###############################################"
             echo -e "${green}用户名: ${usernameTemp}${plain}"
@@ -308,6 +309,65 @@ install_x-ui() {
     echo ""
     config_after_install
 
+ssh_forwarding() {
+    # 获取 IPv4 和 IPv6 地址
+    v4=$(curl -s4m8 http://ip.sb -k)
+    v6=$(curl -s6m8 http://ip.sb -k)
+    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}') 
+    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}') 
+    local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+    local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
+
+    if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
+        echo -e "${green}面板已安装证书采用SSL保护${plain}"
+        echo ""
+        echo -e "${green}登录访问面板URL: https://你的域名:${existing_port}${green}${existing_webBasePath}${plain}" 
+    fi
+    echo ""
+    if [[ -z "$existing_cert" && -z "$existing_key" ]]; then
+        echo -e "${red}警告：未找到证书和密钥，面板不安全！${plain}"
+        echo ""
+        echo -e "${green}------->>>>请按照下述方法设置〔ssh转发〕<<<<-------${plain}"
+        echo ""
+
+        # 检查 IP 并输出相应的 SSH 和浏览器访问信息
+        if [[ -z $v4 ]]; then
+            echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh  -L [::]:15208:127.0.0.1:${existing_port}${blue} root@[$v6]${plain}"
+            echo ""
+            echo -e "${green}2、请通过快捷键【Win + R】调出运行窗口，在里面输入【cmd】打开本地终端服务${plain}"
+            echo ""
+            echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
+            echo ""
+            echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔3X-UI〕登录界面"
+            echo ""
+            echo -e "${red}注意：若不使用〔ssh转发〕请为3X-UI面板配置安装证书再行登录管理后台${plain}"
+        elif [[ -n $v4 && -n $v6 ]]; then
+            echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh -L 15208:127.0.0.1:${existing_port}${blue} root@$v4${plain} ${yellow}或者 ${blue}ssh  -L [::]:15208:127.0.0.1:${existing_port}${blue} root@[$v6]${plain}"
+            echo ""
+            echo -e "${green}2、请通过快捷键【Win + R】调出运行窗口，在里面输入【cmd】打开本地终端服务${plain}"
+            echo ""
+            echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
+            echo ""
+            echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${yellow}或者${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔3X-UI〕登录界面"
+            echo ""
+            echo -e "${red}注意：若不使用〔ssh转发〕请为3X-UI面板配置安装证书再行登录管理后台${plain}"
+        else
+            echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh -L 15208:127.0.0.1:${existing_port}${blue} root@$v4${plain}"
+            echo ""
+            echo -e "${green}2、请通过快捷键【Win + R】调出运行窗口，在里面输入【cmd】打开本地终端服务${plain}"
+            echo ""
+            echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
+            echo ""
+            echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${green}进入〔3X-UI〕登录界面"
+            echo ""
+            echo -e "${red}注意：若不使用〔ssh转发〕请为3X-UI面板配置安装证书再行登录管理后台${plain}"
+            echo ""
+        fi
+    fi
+}
+# 执行ssh端口转发
+ssh_forwarding
+
     cp -f x-ui.service /etc/systemd/system/
     systemctl daemon-reload
     systemctl enable x-ui
@@ -377,7 +437,7 @@ echo -e "----------------------------------------------"
 echo ""
 echo -e "${green}〔3X-UI〕优化版项目地址：${yellow}https://github.com/xeefei/3x-ui${plain}" 
 echo ""
-echo -e "${green} 详细安装教程：${yellow}https://xeefei.github.io/xufei/2024/05/3x-ui/${plain}"
+echo -e "${green} 详细安装教程：${yellow}https://xeefei.blogspot.com/2025/07/3x-ui.html${plain}"
 echo ""
 echo -e "----------------------------------------------"
 echo ""

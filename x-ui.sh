@@ -2,6 +2,7 @@
 
 red='\033[0;31m'
 green='\033[0;32m'
+blue='\033[0;34m'
 yellow='\033[0;33m'
 plain='\033[0m'
 
@@ -308,6 +309,62 @@ check_config() {
         show_menu
     fi
     echo -e "${info}${plain}"
+    echo ""
+    
+    # 获取 IPv4 和 IPv6 地址
+    v4=$(curl -s4m8 http://ip.sb -k)
+    v6=$(curl -s6m8 http://ip.sb -k)
+    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath（访问路径）: .+' | awk '{print $2}') 
+    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port（端口号）: .+' | awk '{print $2}') 
+    local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+    local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
+
+    if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
+        echo -e "${green}面板已安装证书采用SSL保护${plain}"
+        echo ""
+        echo -e "${green}登录访问面板URL: https://你的域名:${existing_port}${green}${existing_webBasePath}${plain}" 
+    fi
+    echo ""
+    if [[ -z "$existing_cert" && -z "$existing_key" ]]; then
+        echo -e "${red}警告：未找到证书和密钥，面板不安全！${plain}"
+        echo ""
+        echo -e "${green}------->>>>请按照下述方法设置〔ssh转发〕<<<<-------${plain}"
+        echo ""
+
+        # 检查 IP 并输出相应的 SSH 和浏览器访问信息
+        if [[ -z $v4 ]]; then
+            echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh  -L [::]:15208:127.0.0.1:${existing_port}${blue} root@[$v6]${plain}"
+            echo ""
+            echo -e "${green}2、请通过快捷键【Win + R】调出运行窗口，在里面输入【cmd】打开本地终端服务${plain}"
+            echo ""
+            echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
+            echo ""
+            echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔3X-UI〕登录界面"
+            echo ""
+            echo -e "${red}注意：若不使用〔ssh转发〕请为3X-UI面板配置安装证书再行登录管理后台${plain}"
+        elif [[ -n $v4 && -n $v6 ]]; then
+            echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh -L 15208:127.0.0.1:${existing_port}${blue} root@$v4${plain} ${yellow}或者 ${blue}ssh  -L [::]:15208:127.0.0.1:${existing_port}${blue} root@[$v6]${plain}"
+            echo ""
+            echo -e "${green}2、请通过快捷键【Win + R】调出运行窗口，在里面输入【cmd】打开本地终端服务${plain}"
+            echo ""
+            echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
+            echo ""
+            echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${yellow}或者${plain} ${blue}[::1]:15208${existing_webBasePath}${plain} ${green}进入〔3X-UI〕登录界面"
+            echo ""
+            echo -e "${red}注意：若不使用〔ssh转发〕请为3X-UI面板配置安装证书再行登录管理后台${plain}"
+        else
+            echo -e "${green}1、本地电脑客户端转发命令：${plain} ${blue}ssh -L 15208:127.0.0.1:${existing_port}${blue} root@$v4${plain}"
+            echo ""
+            echo -e "${green}2、请通过快捷键【Win + R】调出运行窗口，在里面输入【cmd】打开本地终端服务${plain}"
+            echo ""
+            echo -e "${green}3、请在终端中成功输入服务器的〔root密码〕，注意区分大小写，用以上命令进行转发${plain}"
+            echo ""
+            echo -e "${green}4、请在浏览器地址栏复制${plain} ${blue}127.0.0.1:15208${existing_webBasePath}${plain} ${green}进入〔3X-UI〕登录界面"
+            echo ""
+            echo -e "${red}注意：若不使用〔ssh转发〕请为3X-UI面板配置安装证书再行登录管理后台${plain}"
+            echo ""
+        fi
+    fi
 }
 
 set_port() {
@@ -1030,7 +1087,7 @@ ssl_cert_issue() {
              LOGI "  - 证书文件: $webCertFile" 
              LOGI "  - 私钥文件: $webKeyFile" 
              echo ""
-             echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${existing_webBasePath}${plain}" 
+             echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${green}${existing_webBasePath}${plain}" 
              echo ""
              echo -e "${green}PS：若您要登录访问面板，请复制上面的地址到浏览器即可${plain}"
              echo ""
@@ -1175,7 +1232,7 @@ ssl_cert_issue_CF() {
                  LOGI "  - 证书文件: $webCertFile" 
                  LOGI "  - 私钥文件: $webKeyFile" 
                  echo ""
-                 echo -e "${green}登录访问面板URL: https://${CF_Domain}:${existing_port}${existing_webBasePath}${plain}" 
+                 echo -e "${green}登录访问面板URL: https://${CF_Domain}:${existing_port}${green}${existing_webBasePath}${plain}" 
                  echo ""
                  echo -e "${green}PS：若您要登录访问面板，请复制上面的地址到浏览器即可${plain}"
                  echo ""
@@ -1559,7 +1616,7 @@ show_menu() {
   ${green}4.${plain} 自定义版本
   ${green}5.${plain} 卸载面板
 ——————————————————————
-  ${green}6.${plain} 重置用户名、密码和Secret Token
+  ${green}6.${plain} 重置用户名、密码
   ${green}7.${plain} 修改访问路径
   ${green}8.${plain} 重置面板设置
   ${green}9.${plain} 修改面板端口
@@ -1590,7 +1647,7 @@ show_menu() {
   ${green}〔3X-UI〕优化版项目地址${plain}
   ${yellow}https://github.com/xeefei/3x-ui${plain}
   ${green}详细〔安装配置〕教程${plain}
-  ${yellow}https://xeefei.github.io/xufei/2024/05/3x-ui${plain}
+  ${yellow}https://xeefei.blogspot.com/2025/07/3x-ui.html${plain}
 ——————————————————————
 "
     show_status
